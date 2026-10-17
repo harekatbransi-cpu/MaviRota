@@ -421,32 +421,52 @@
 
     function irtifaGoster(lat, lon, ad, marker) {
         marker.bindPopup('<b>' + ad + '</b><br>İrtifa hesaplanıyor...').openPopup();
-        fetch('https://api.open-meteo.com/v1/elevation?latitude=' +
-              lat + '&longitude=' + lon)
-        .then(function(r) { return r.json(); })
+
+        var url = 'https://api.open-meteo.com/v1/elevation?latitude=' +
+                  encodeURIComponent(lat) + '&longitude=' + encodeURIComponent(lon);
+
+        fetch(url)
+        .then(function(r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
         .then(function(data) {
-            var m = data.elevation[0];
+            if (!data || !Array.isArray(data.elevation) ||
+                data.elevation.length === 0 ||
+                !Number.isFinite(Number(data.elevation[0]))) {
+                throw new Error('Yanıtta irtifa verisi yok');
+            }
+
+            var m = Number(data.elevation[0]);
+            var enlemYon = lat < 0 ? 'S' : 'N';
+            var boylamYon = lon < 0 ? 'W' : 'E';
+
             marker.setPopupContent(
                 '<b>' + ad + '</b><br>' +
                 'Enlem: ' + Math.floor(Math.abs(lat)) + '° ' +
-                    Math.floor((Math.abs(lat) % 1) * 60).toString().padStart(2, '0') + '′ ' +
-                    ((((Math.abs(lat) % 1) * 60) % 1) * 60).toFixed(2).padStart(5, '0') + '″ ' +
-                    (lat < 0 ? 'S' : 'N') + ' (' + lat.toFixed(5) + ')<br>' +
+                Math.floor((Math.abs(lat) % 1) * 60).toString().padStart(2, '0') + '′ ' +
+                ((((Math.abs(lat) % 1) * 60) % 1) * 60).toFixed(2).padStart(5, '0') + '″ ' +
+                enlemYon + ' (' + lat.toFixed(5) + ')<br>' +
                 'Boylam: ' + Math.floor(Math.abs(lon)).toString().padStart(3, '0') + '° ' +
-                    Math.floor((Math.abs(lon) % 1) * 60).toString().padStart(2, '0') + '′ ' +
-                    ((((Math.abs(lon) % 1) * 60) % 1) * 60).toFixed(2).padStart(5, '0') + '″ ' +
-                    (lon < 0 ? 'W' : 'E') + ' (' + lon.toFixed(5) + ')<br>' +
+                Math.floor((Math.abs(lon) % 1) * 60).toString().padStart(2, '0') + '′ ' +
+                ((((Math.abs(lon) % 1) * 60) % 1) * 60).toFixed(2).padStart(5, '0') + '″ ' +
+                boylamYon + ' (' + lon.toFixed(5) + ')<br>' +
                 '<b>İrtifa: ' + m + ' m</b><br>' +
                 '<b>İrtifa: ' + (m * 3.28084).toFixed(0) + ' ft</b><br>' +
                 '<b>Deniz derinliği: ' + derinlikBul(lat, lon) + '</b>' +
-                '<br><button title="Merkezdeki noktaya mevki ekle" onclick="(function(){var b=map.getSize();var c=map.containerPointToLatLng([b.x/2,b.y/2]);window.mevkiTuruSec(c.lat,c.lng);})()" style="font-size:22px;padding:5px 12px;background:#168cff;color:white;border:1px solid #0873d1;border-radius:7px;">📌</button>'
+                '<br><button title="Merkezdeki noktaya mevki ekle" ' +
+                'onclick="(function(){var b=map.getSize();var c=map.containerPointToLatLng([b.x/2,b.y/2]);window.mevkiTuruSec(c.lat,c.lng);})()" ' +
+                'style="font-size:22px;padding:5px 12px;background:#168cff;color:white;border:1px solid #0873d1;border-radius:7px;">📌</button>'
             );
         })
-        .catch(function() {
-            marker.setPopupContent(ad + '<br>İrtifa alınamadı.');
+        .catch(function(err) {
+            console.error('İrtifa alınamadı:', err);
+            marker.setPopupContent(
+                '<b>' + ad + '</b><br>' +
+                'İrtifa alınamadı. İnternet bağlantısını kontrol edin.'
+            );
         });
     }
-
     function ara() {
         var q = document.getElementById('yerAra').value.trim();
         var sonuc = document.getElementById('aramaSonuc');
