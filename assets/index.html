@@ -463,7 +463,8 @@
             console.error('İrtifa alınamadı:', err);
             marker.setPopupContent(
                 '<b>' + ad + '</b><br>' +
-                'İrtifa alınamadı. İnternet bağlantısını kontrol edin.'
+                'İrtifa alınamadı: ' +
+                String(err && err.message ? err.message : err)
             );
         });
     }
