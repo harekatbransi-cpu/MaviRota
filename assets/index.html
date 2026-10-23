@@ -269,6 +269,12 @@
       'style="width:42px;height:42px;border:1px solid #d8e5e8;border-radius:10px;' +
       'background:#f2f8f8;color:#285b68;font-size:23px;line-height:1;cursor:pointer;">🚁</button>' +
       '<div id="mavirotaGpsDurum" style="font:10px Arial;color:#49636b;margin-top:3px;">GPS</div>' +
+        '<button id="mavirotaNotamDugme" type="button" style="width:100%;margin-top:6px;padding:7px;border:1px solid #dfceb0;border-radius:7px;background:#f8f1e4;color:#493c29;font-weight:bold">NOTAM listesi</button>' +
+        '<div id="mavirotaNotamPanel" style="display:none;margin-top:6px;padding:7px;background:#fffaf0;border:1px solid #dfceb0;border-radius:7px">' +
+        '<label for="mavirotaNotamTarih" style="display:block;font:12px Arial;margin-bottom:4px">Geçerlilik tarihi</label>' +
+        '<input id="mavirotaNotamTarih" type="date" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid #dfceb0;border-radius:5px;background:#fffdf8">' +
+        '<div id="mavirotaNotamSayac" style="font:12px Arial;margin:6px 0;color:#493c29">NOTAM verileri yüklenmedi</div>' +
+        '<div id="mavirotaNotamListe" style="max-height:180px;overflow:auto"></div></div>' +
         '<button id="araBtn" style="width:100%;padding:9px;margin-top:7px;' +
           'border:0;border-radius:7px;background:#e8eef7">Ara</button>' +
           '<div id="aramaSonuc" style="max-height:200px;overflow:auto;margin-top:6px"></div>' +
@@ -3329,70 +3335,103 @@ var layer_control_3f1463a911a6a732210e0d69a26a84c6_layers = {
 
 
 // MAVIROTA_NOTAM_KATMANI
-var mavirotaNotamKatmani = L.geoJSON(null, {
-  style: function(f) {
-    var q = (f.properties || {}).Q_23 || "";
-    var c = q === "WP" ? "#dc2626" : q === "WL" ? "#ea580c" :
-            q === "WG" ? "#7c3aed" : "#2563eb";
-    return {color:c, weight:2, fillColor:c, fillOpacity:0.16};
-  },
-  pointToLayer: function(f, ll) {
-    return L.circleMarker(ll, {
-      radius:5, color:"#b91c1c", fillColor:"#ef4444", fillOpacity:0.8
+(function() {
+  var map = mavirotaModMap;
+  var btn = document.getElementById("mavirotaNotamDugme");
+  var panel = document.getElementById("mavirotaNotamPanel");
+  var tarih = document.getElementById("mavirotaNotamTarih");
+  var liste = document.getElementById("mavirotaNotamListe");
+  var sayac = document.getElementById("mavirotaNotamSayac");
+  var katman = L.geoJSON(null, {
+    filter: function(f) { return !!((f.properties || {}).NOTAMNO); },
+    style: function() {
+      return {color:"#806747", weight:2, fillColor:"#ead9b5", fillOpacity:0.42};
+    },
+    pointToLayer: function(f,ll) {
+      return L.circleMarker(ll,{radius:6,color:"#806747",weight:2,fillColor:"#ead9b5",fillOpacity:0.9});
+    },
+    onEachFeature: function(f,layer) {
+      var p=f.properties||{}, box=document.createElement("div"), h=document.createElement("b");
+      h.textContent=String(p.NOTAMNO||p.name||"NOTAM");
+      box.appendChild(h);
+      var hr=document.createElement("hr"); box.appendChild(hr);
+      var d=document.createElement("div"); d.style.whiteSpace="pre-wrap";
+      d.textContent=String(p.description||p.name||"Açıklama yok")
+        .replace(/<br\s*\/?>/gi,"\n")
+        .replace(/<\/?(b|strong|i|u|p|div)[^>]*>/gi,"")
+        .replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&")
+        .replace(/&lt;/gi,"<").replace(/&gt;/gi,">");
+      box.appendChild(d);
+      layer.bindPopup(box,{maxWidth:300});
+    }
+  });
+  var yuklendi=false, gorunuyor=false, veriler=[];
+
+  function notamTarih(metin) {
+    var m=String(metin||"").match(/(\d{2})(\d{2})(\d{2})(\d{4})/);
+    if(!m) return null;
+    var d=new Date(Date.UTC(2000+Number(m[1]),Number(m[2])-1,Number(m[3]),Number(m[4].slice(0,2)),Number(m[4].slice(2,4))));
+    return isNaN(d.getTime())?null:d;
+  }
+  function tarihAraligi(f) {
+    var acik=String((f.properties||{}).description||"");
+    var b=acik.match(/\bB\)\s*([0-9]{10})/i), c=acik.match(/\bC\)\s*([0-9]{10})/i);
+    return {bas:b?notamTarih(b[1]):null,son:c?notamTarih(c[1]):null};
+  }
+  function listele() {
+    liste.replaceChildren();
+    if(!yuklendi){sayac.textContent="NOTAM verileri yükleniyor…";return;}
+    var gun=tarih.value?new Date(tarih.value+"T12:00:00Z"):new Date();
+    var bulunan=veriler.filter(function(f){
+      var t=tarihAraligi(f);
+      return (!t.bas||t.bas<=gun)&&(!t.son||t.son>=gun);
     });
-  },
-  onEachFeature: function(f, layer) {
-    var p = f.properties || {};
-    var title = String(p.NOTAMNO || p.name || "Harita öğesi");
-    var desc = String(p.description || "Açıklama yok");
-    layer.bindPopup("<b>" + title.replace(/[&<>"]/g, function(c) {
-      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
-    }) + "</b><hr>" + desc, {maxWidth:300});
-  }
-});
-var mavirotaNotamKontrol = L.control({position:"bottomright"});
-mavirotaNotamKontrol.onAdd = function() {
-  var d = L.DomUtil.create("div","mavirota-notam-control");
-  d.innerHTML = '<button id="mavirotaNotamDugme" type="button" ' +
-    'style="padding:12px;border:1px solid #ddd;border-radius:10px;' +
-    'background:white;color:#b91c1c;font-weight:bold">NOTAM</button>';
-  L.DomEvent.disableClickPropagation(d);
-  return d;
-};
-mavirotaNotamKontrol.addTo(mavirotaModMap);
-var mavirotaNotamDugme = document.getElementById("mavirotaNotamDugme");
-var mavirotaNotamYuklendi = false;
-var mavirotaNotamGorunuyor = false;
-mavirotaNotamDugme.addEventListener("click", function() {
-  if (!mavirotaNotamYuklendi) {
-    mavirotaNotamDugme.textContent = "Yükleniyor...";
-    fetch("MaviRota_NOTAM.geojson").then(function(r) {
-      if (!r.ok) throw new Error("Dosya okunamadı");
-      return r.json();
-    }).then(function(data) {
-      mavirotaNotamKatmani.addData(data);
-      mavirotaNotamYuklendi = true;
-      mavirotaNotamKatmani.addTo(mavirotaModMap);
-      mavirotaNotamGorunuyor = true;
-      mavirotaNotamDugme.textContent = "NOTAM ✓";
-    }).catch(function(e) {
-      console.error(e);
-      mavirotaNotamDugme.textContent = "NOTAM HATA";
-      alert("NOTAM dosyası yüklenemedi.");
+    sayac.textContent=bulunan.length+" kayıt";
+    bulunan.sort(function(a,b){
+      return String((a.properties||{}).NOTAMNO).localeCompare(String((b.properties||{}).NOTAMNO));
+    }).forEach(function(f){
+      var b=document.createElement("button"); b.type="button";
+      b.textContent=String((f.properties||{}).NOTAMNO||"NOTAM");
+      b.style.cssText="display:block;width:100%;text-align:left;padding:7px;margin:3px 0;background:#f8f1e4;border:1px solid #dfceb0;border-radius:5px;color:#493c29";
+      b.addEventListener("click",function(){
+        var l=katman.getLayers().find(function(x){return x.feature===f;});
+        if(!l)return;
+        if(l.getBounds&&l.getBounds().isValid())map.fitBounds(l.getBounds(),{maxZoom:10});
+        else if(l.getLatLng)map.setView(l.getLatLng(),Math.max(map.getZoom(),8));
+        l.openPopup();
+      });
+      liste.appendChild(b);
     });
-    return;
   }
-  if (mavirotaNotamGorunuyor) {
-    mavirotaModMap.removeLayer(mavirotaNotamKatmani);
-    mavirotaNotamGorunuyor = false;
-    mavirotaNotamDugme.textContent = "NOTAM";
-  } else {
-    mavirotaNotamKatmani.addTo(mavirotaModMap);
-    mavirotaNotamGorunuyor = true;
-    mavirotaNotamDugme.textContent = "NOTAM ✓";
-  }
-});
-// Kaynaktaki NOTAM kayıtlarının güncelliği ayrıca doğrulanmalıdır.
+  btn.addEventListener("click",function(){
+    panel.style.display=panel.style.display==="none"?"block":"none";
+    if(panel.style.display==="none"){
+      if(gorunuyor)map.removeLayer(katman);
+      gorunuyor=false; btn.textContent="NOTAM listesi"; return;
+    }
+    if(!yuklendi){
+      btn.textContent="NOTAM yükleniyor…";
+      fetch("MaviRota_NOTAM.geojson").then(function(r){
+        if(!r.ok)throw new Error("NOTAM dosyası okunamadı");
+        return r.json();
+      }).then(function(data){
+        veriler=(data.features||[]).filter(function(f){return !!((f.properties||{}).NOTAMNO);});
+        katman.addData({type:"FeatureCollection",features:veriler});
+        yuklendi=true; katman.addTo(map); gorunuyor=true;
+        btn.textContent="NOTAM katmanını kapat"; listele();
+      }).catch(function(e){
+        console.error(e); btn.textContent="NOTAM listesi";
+        sayac.textContent="NOTAM dosyası yüklenemedi.";
+      });
+    }else{
+      if(!gorunuyor)katman.addTo(map);
+      gorunuyor=true; btn.textContent="NOTAM katmanını kapat"; listele();
+    }
+  });
+  tarih.addEventListener("change",listele);
+  tarih.value=new Date().toISOString().slice(0,10);
+  // Yerel NOTAM verisinin güncelliği resmî kaynaklardan doğrulanmalıdır.
+})();
 
 // Harita açılınca GPS takibini otomatik başlat.
 setTimeout(function() {
