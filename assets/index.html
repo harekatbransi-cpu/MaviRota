@@ -273,7 +273,7 @@
         '<div id="mavirotaNotamPanel" style="display:none;margin-top:6px;padding:7px;background:#fffaf0;border:1px solid #dfceb0;border-radius:7px">' +
         '<label for="mavirotaNotamTarih" style="display:block;font:12px Arial;margin-bottom:4px">Geçerlilik tarihi</label>' +
         '<input id="mavirotaNotamTarih" type="date" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid #dfceb0;border-radius:5px;background:#fffdf8">' +
-        '<div id="mavirotaNotamSayac" style="font:12px Arial;margin:6px 0;color:#493c29">NOTAM verileri yüklenmedi</div>' +
+
         '<div id="mavirotaNotamListe" style="max-height:180px;overflow:auto"></div></div>' +
         '<button id="araBtn" style="width:100%;padding:9px;margin-top:7px;' +
           'border:0;border-radius:7px;background:#e8eef7">Ara</button>' +
@@ -501,6 +501,7 @@
             })
             .catch(function(err) {
                 console.error('Yerel irtifa okunamadı:', err);
+                var irtifaHata = (err && err.message) ? err.message : String(err);
                 var enlemYon = lat < 0 ? 'S' : 'N';
                 var boylamYon = lon < 0 ? 'W' : 'E';
                 marker.setPopupContent(
@@ -509,6 +510,7 @@
                     'Enlem: ' + lat.toFixed(5) + '° ' + enlemYon + '<br>' +
                     'Boylam: ' + lon.toFixed(5) + '° ' + boylamYon + '<br>' +
                     '<b>İrtifa: veri yok</b><br>' +
+                    '<small>Tanı: ' + irtifaHata.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</small><br>' +
                     '<b>Deniz derinliği: ' + derinlikBul(lat, lon) + '</b>' +
                     '</div>'
                 );
@@ -3380,13 +3382,13 @@ var layer_control_3f1463a911a6a732210e0d69a26a84c6_layers = {
   }
   function listele() {
     liste.replaceChildren();
-    if(!yuklendi){sayac.textContent="NOTAM verileri yükleniyor…";return;}
+    if(!yuklendi){return;}
     var gun=tarih.value?new Date(tarih.value+"T12:00:00Z"):new Date();
     var bulunan=veriler.filter(function(f){
       var t=tarihAraligi(f);
       return (!t.bas||t.bas<=gun)&&(!t.son||t.son>=gun);
     });
-    sayac.textContent=bulunan.length+" kayıt";
+
     bulunan.sort(function(a,b){
       return String((a.properties||{}).NOTAMNO).localeCompare(String((b.properties||{}).NOTAMNO));
     }).forEach(function(f){
@@ -3421,7 +3423,7 @@ var layer_control_3f1463a911a6a732210e0d69a26a84c6_layers = {
         btn.textContent="NOTAM katmanını kapat"; listele();
       }).catch(function(e){
         console.error(e); btn.textContent="NOTAM listesi";
-        sayac.textContent="NOTAM dosyası yüklenemedi.";
+        console.error("NOTAM dosyası yüklenemedi.");
       });
     }else{
       if(!gorunuyor)katman.addTo(map);
