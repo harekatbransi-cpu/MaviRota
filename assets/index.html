@@ -3327,6 +3327,73 @@ var layer_control_3f1463a911a6a732210e0d69a26a84c6_layers = {
 
   mavirotaModSec('deniz');
 
+
+// MAVIROTA_NOTAM_KATMANI
+var mavirotaNotamKatmani = L.geoJSON(null, {
+  style: function(f) {
+    var q = (f.properties || {}).Q_23 || "";
+    var c = q === "WP" ? "#dc2626" : q === "WL" ? "#ea580c" :
+            q === "WG" ? "#7c3aed" : "#2563eb";
+    return {color:c, weight:2, fillColor:c, fillOpacity:0.16};
+  },
+  pointToLayer: function(f, ll) {
+    return L.circleMarker(ll, {
+      radius:5, color:"#b91c1c", fillColor:"#ef4444", fillOpacity:0.8
+    });
+  },
+  onEachFeature: function(f, layer) {
+    var p = f.properties || {};
+    var title = String(p.NOTAMNO || p.name || "Harita öğesi");
+    var desc = String(p.description || "Açıklama yok");
+    layer.bindPopup("<b>" + title.replace(/[&<>"]/g, function(c) {
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    }) + "</b><hr>" + desc, {maxWidth:300});
+  }
+});
+var mavirotaNotamKontrol = L.control({position:"bottomright"});
+mavirotaNotamKontrol.onAdd = function() {
+  var d = L.DomUtil.create("div","mavirota-notam-control");
+  d.innerHTML = '<button id="mavirotaNotamDugme" type="button" ' +
+    'style="padding:12px;border:1px solid #ddd;border-radius:10px;' +
+    'background:white;color:#b91c1c;font-weight:bold">NOTAM</button>';
+  L.DomEvent.disableClickPropagation(d);
+  return d;
+};
+mavirotaNotamKontrol.addTo(mavirotaModMap);
+var mavirotaNotamDugme = document.getElementById("mavirotaNotamDugme");
+var mavirotaNotamYuklendi = false;
+var mavirotaNotamGorunuyor = false;
+mavirotaNotamDugme.addEventListener("click", function() {
+  if (!mavirotaNotamYuklendi) {
+    mavirotaNotamDugme.textContent = "Yükleniyor...";
+    fetch("MaviRota_NOTAM.geojson").then(function(r) {
+      if (!r.ok) throw new Error("Dosya okunamadı");
+      return r.json();
+    }).then(function(data) {
+      mavirotaNotamKatmani.addData(data);
+      mavirotaNotamYuklendi = true;
+      mavirotaNotamKatmani.addTo(mavirotaModMap);
+      mavirotaNotamGorunuyor = true;
+      mavirotaNotamDugme.textContent = "NOTAM ✓";
+    }).catch(function(e) {
+      console.error(e);
+      mavirotaNotamDugme.textContent = "NOTAM HATA";
+      alert("NOTAM dosyası yüklenemedi.");
+    });
+    return;
+  }
+  if (mavirotaNotamGorunuyor) {
+    mavirotaModMap.removeLayer(mavirotaNotamKatmani);
+    mavirotaNotamGorunuyor = false;
+    mavirotaNotamDugme.textContent = "NOTAM";
+  } else {
+    mavirotaNotamKatmani.addTo(mavirotaModMap);
+    mavirotaNotamGorunuyor = true;
+    mavirotaNotamDugme.textContent = "NOTAM ✓";
+  }
+});
+// Kaynaktaki NOTAM kayıtlarının güncelliği ayrıca doğrulanmalıdır.
+
 // Harita açılınca GPS takibini otomatik başlat.
 setTimeout(function() {
   var gpsDugmesi = document.getElementById('mavirotaGpsDugme');
